@@ -1,0 +1,26 @@
+name: Sync Upstream
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Automatically runs every day at midnight UTC
+  workflow_dispatch: # Allows you to manually trigger the sync anytime via the Actions tab
+
+jobs:
+  sync:
+    name: Sync latest commits from upstream
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout target branch
+      uses: actions/checkout@v4
+      with:
+        ref: main # The branch in your fork you want to update
+
+    - name: Sync Upstream
+      uses: aormsby/Fork-Sync-With-Upstream-action@v3.4.1
+      with:
+        target_repo_token: ${{ secrets.GITHUB_TOKEN }}
+        upstream_repository: raketbizdev/autoposter
+        upstream_branch: main
+        target_branch: main
+        test_mode: false
