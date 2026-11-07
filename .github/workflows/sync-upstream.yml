@@ -14,13 +14,13 @@ jobs:
     - name: Checkout target branch
       uses: actions/checkout@v4
       with:
-        ref: main # The branch in your fork you want to update
+        ref: main 
 
     - name: Sync Upstream
       uses: aormsby/Fork-Sync-With-Upstream-action@v3.4.1
       with:
         target_repo_token: ${{ secrets.GITHUB_TOKEN }}
-        upstream_repository: raketbizdev/autoposter
-        upstream_branch: main
-        target_branch: main
+        upstream_sync_repo: raketbizdev/autoposter
+        upstream_sync_branch: main
+        target_sync_branch: main
         test_mode: false
