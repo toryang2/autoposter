@@ -179,3 +179,15 @@ test('"Post now" runs a future job first, ignoring the group gap, daily cap and 
   assert.equal((await tick(db, opts(at(2)))).action, 'paused', 'the override is one-shot');
   assert.equal(status(db, due.id), 'queued');
 });
+
+test('posted without its first comment: still Posted, with a note to add it by hand', async () => {
+  const { db, p } = setup();
+  const d = addDestination(db, { type: 'group' });
+  const j = addJob(db, d.id, T0);
+  db.prepare("UPDATE posts SET first_comment = 'link' WHERE id = ?").run(j.post_id);
+  const noComment = { kind: 'result', result: { status: 'submitted', clicked_post: true, post_url: null, commented: false, note: 'comment box missing' } };
+  await tick(db, { paths: p, runJob: fakeRun(noComment), now: () => T0 });
+  const row = db.prepare('SELECT status, last_error FROM jobs WHERE id = ?').get(j.id);
+  assert.equal(row.status, 'submitted');
+  assert.match(row.last_error, /first comment wasn't added/);
+});

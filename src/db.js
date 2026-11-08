@@ -102,6 +102,10 @@ export function openDb(file) {
   if (!db.prepare('PRAGMA table_info(jobs)').all().some((c) => c.name === 'post_as')) {
     db.exec('ALTER TABLE jobs ADD COLUMN post_as TEXT');
   }
+  // Optional first comment, added by Claude right after the post is live (links go here: many groups ban links in posts).
+  if (!db.prepare('PRAGMA table_info(posts)').all().some((c) => c.name === 'first_comment')) {
+    db.exec('ALTER TABLE posts ADD COLUMN first_comment TEXT');
+  }
   // "Post now" flag: the next worker pass runs this job first, ignoring the group gap, daily cap and usage pause.
   if (!db.prepare('PRAGMA table_info(jobs)').all().some((c) => c.name === 'force_now')) {
     db.exec('ALTER TABLE jobs ADD COLUMN force_now INTEGER NOT NULL DEFAULT 0');
@@ -142,7 +146,7 @@ export function tx(db, fn) {
 export function getJob(db, id) {
   return db.prepare(`
     SELECT j.*, d.name AS destination_name, d.type AS destination_type, d.url AS destination_url, d.platform AS destination_platform, d.post_as AS destination_post_as,
-           d.audience AS destination_audience, d.enabled AS destination_enabled, p.body AS post_body
+           d.audience AS destination_audience, d.enabled AS destination_enabled, p.body AS post_body, p.first_comment
     FROM jobs j JOIN destinations d ON d.id = j.destination_id JOIN posts p ON p.id = j.post_id
     WHERE j.id = ?`).get(id);
 }

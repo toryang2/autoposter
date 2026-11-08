@@ -180,7 +180,13 @@ POST_TEXT>>>
 
 ${media}
 
-Rules:
+${job.first_comment ? `FIRST COMMENT: only after you have seen the new post live (status "submitted"), add ONE comment on that post with exactly this text (between the markers, nothing added or removed):
+<<<COMMENT_TEXT
+${job.first_comment}
+COMMENT_TEXT>>>
+Find the new post at the top of the feed (posted by the owner, matching the post text), click its Comment box, type the text, and send it once with Enter or the send button. Check the comment appears under the post. Do NOT comment if the post is pending approval or you are not sure which post is yours. A missing comment never makes the post "failed".
+
+` : ''}Rules:
 ${accountRule(platform, settings)}
 - Open a new tab for this work. When you are finished, whatever the outcome, close every tab you opened with tabs_close_mcp before writing your final reply.
 - If you see a login page, CAPTCHA, security checkpoint or "confirm it's you", stop immediately and report failed. Never try to solve or bypass it.
@@ -190,7 +196,7 @@ ${accountRule(platform, settings)}
 
 When done, end your reply with a fenced json block exactly like:
 \`\`\`json
-{"status":"submitted|pending_approval|awaiting_join|failed","clicked_post":true|false,"post_url":null,"note":"short description of what happened"}
+{"status":"submitted|pending_approval|awaiting_join|failed","clicked_post":true|false,"post_url":null,${job.first_comment ? '"commented":true|false,' : ''}"note":"short description of what happened"}
 \`\`\`
 "clicked_post" must be true if you clicked Post at any point, even if you are unsure it worked.
 Report "submitted" only after you have seen the new post live on the destination. If you clicked Post but cannot see it live, report "failed" with clicked_post true and say so in the note.

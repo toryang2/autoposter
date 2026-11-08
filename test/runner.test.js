@@ -143,3 +143,14 @@ test('the post\'s own "Who" beats the group setting; "@self" posts as the person
   assert.doesNotMatch(buildPrompt({ ...g, post_as: '@self' }, []), /POST AS THE PAGE/);
   assert.match(buildPrompt(g, []), /POST AS THE PAGE "Group Page"/);
 });
+
+test('a first comment is added after the post is live, and asked for in the report', async () => {
+  const { buildPrompt } = await import('../src/prompt.js');
+  const g = { destination_platform: 'facebook', destination_type: 'group', destination_name: 'G', destination_url: 'https://www.facebook.com/groups/g', post_body: 'Hi' };
+  const withComment = buildPrompt({ ...g, first_comment: 'Get it here: https://example.com' }, []);
+  assert.match(withComment, /FIRST COMMENT/);
+  assert.match(withComment, /<<<COMMENT_TEXT\nGet it here: https:\/\/example\.com\nCOMMENT_TEXT>>>/);
+  assert.match(withComment, /"commented":true\|false/);
+  assert.doesNotMatch(buildPrompt(g, []), /FIRST COMMENT|commented/);
+  assert.equal(parseResultBlock('```json\n{"status":"submitted","clicked_post":true,"post_url":null,"commented":false,"note":"x"}\n```').commented, false);
+});

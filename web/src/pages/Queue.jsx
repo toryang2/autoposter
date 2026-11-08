@@ -115,6 +115,12 @@ function JobDetail({ job, onAction, onSaved, focusLink }) {
     <Box sx={{ px: { xs: 2, md: 2.5 }, pb: 2.5, pt: 0.5 }}>
       <Box sx={{ p: 2, borderRadius: 2.5, bgcolor: 'background.default' }}>
         <Typography sx={{ whiteSpace: 'pre-wrap', fontSize: 14 }}>{job.post_body || '(no text)'}</Typography>
+        {job.first_comment && (
+          <Box sx={{ mt: 1.5, pt: 1.5, borderTop: 1, borderColor: 'divider' }}>
+            <Typography variant="caption" color="text.secondary" fontWeight={700}>First comment</Typography>
+            <Typography sx={{ whiteSpace: 'pre-wrap', fontSize: 14 }}>{job.first_comment}</Typography>
+          </Box>
+        )}
         {media.length > 0 && (
           <Stack direction="row" gap={1} mt={1.5} flexWrap="wrap">
             {media.map((m) => {

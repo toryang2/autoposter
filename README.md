@@ -1,6 +1,22 @@
 # Autoposter
 
+[![Test and build](https://github.com/raketbizdev/autoposter/actions/workflows/build.yml/badge.svg)](https://github.com/raketbizdev/autoposter/actions/workflows/build.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/raketbizdev/autoposter?style=flat&logo=github)](https://github.com/raketbizdev/autoposter/stargazers)
+![Platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey)
+![Node](https://img.shields.io/badge/node-24%2B-339933?logo=node.js&logoColor=white)
+[![Buy on Gumroad](https://img.shields.io/badge/Buy%20the%20app-Gumroad-ff90e8?logo=gumroad&logoColor=black)](https://raket5.gumroad.com/l/autoposter)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?logo=buymeacoffee&logoColor=black)](https://www.buymeacoffee.com/raketbizdev)
+[![PayPal](https://img.shields.io/badge/Donate-PayPal-00457C?logo=paypal&logoColor=white)](https://paypal.me/freelancerdad)
+[![Watch the demo](https://img.shields.io/badge/Watch%20the%20demo-YouTube-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=91bvTaR6GKA)
+
 ![Autoposter](docs/screenshots/cover.png)
+
+<p align="center">
+  <a href="#easy-install"><img src="docs/buttons/get-the-app.svg" alt="Get the app: $39 one-time, Mac and Windows" width="460"></a>
+  <br>
+  <img src="docs/buttons/lemon-squeezy-soon.svg" alt="Lemon Squeezy: coming soon" width="460">
+</p>
 
 A local social media post scheduler for Facebook, LinkedIn, X, Threads, Reddit, Instagram and TikTok. You write and schedule posts in a React dashboard. At post time, a local
 worker runs **Claude Code on your Claude subscription** with the **Claude in Chrome** extension, and Claude
@@ -14,17 +30,31 @@ publishes the post on the website in your signed-in Chrome, the way you would by
 Dashboard (React) → Express API → SQLite → worker (every 60s) → claude -p --chrome → Chrome → the social network
 ```
 
+## Demo video
+
+[![Watch the Autoposter demo on YouTube](https://img.youtube.com/vi/91bvTaR6GKA/maxresdefault.jpg)](https://www.youtube.com/watch?v=91bvTaR6GKA)
+
+▶️ Click the picture to watch Autoposter schedule and publish posts.
+
 ## Easy install
 
 Don't want to build it yourself? Get the ready-to-install app for **Mac (Apple Silicon and Intel) and Windows**:
 
-<!-- Replace "coming soon" with the product links once they're live. -->
+<p align="center">
+  <a href="https://raket5.gumroad.com/l/autoposter"><img src="docs/buttons/get-the-app.svg" alt="Get the app: $39 one-time on Gumroad, Mac and Windows" width="560"></a>
+</p>
+
+<p align="center">
+  <img src="docs/buttons/lemon-squeezy-soon.svg" alt="Lemon Squeezy: coming soon" width="560">
+</p>
+
+<!-- Replace "coming soon" with the product link once it's live. -->
 | Store | Link |
 |---|---|
-| **Lemon Squeezy** | coming soon |
 | **Gumroad** | [Buy on Gumroad](https://raket5.gumroad.com/l/autoposter) |
+| **Lemon Squeezy** | coming soon |
 
-$39, one-time payment. The first 100 customers get a launch discount code; it's posted on my Facebook page.
+$39, one-time payment.
 
 Prefer free? The scheduler is here under the MIT license: see [Run from source](#run-from-source). The desktop app
 (menu bar / tray, auto start, installers) is only in the paid version.
@@ -121,6 +151,21 @@ npm run dev     # Vite dev server on :5173, proxying to npm start on :4317
 ```
 
 Data lives in `data/` (SQLite), `media/` (uploads), `jobs/` (per-run copies) and `logs/` (raw Claude output per run).
+
+## Support the project
+
+Autoposter's scheduler is free and open source. If it saves you time, you can help keep it going:
+
+- **Buy the desktop app** on [Gumroad](https://raket5.gumroad.com/l/autoposter). It's the easiest install, and every sale funds development.
+- **Star the repo** ⭐ so more people find it.
+- **Donate** any amount:
+
+  [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://www.buymeacoffee.com/raketbizdev)
+  [![PayPal](https://img.shields.io/badge/PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/freelancerdad)
+
+  **GCash / InstaPay (Philippines):** scan with GCash, Maya or any bank app.
+
+  <img src="docs/donate/gcash-qr.jpg" alt="GCash InstaPay QR code for donations" width="220">
 
 ## License
 

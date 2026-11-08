@@ -59,6 +59,7 @@ export function parseResultBlock(text) {
       clicked_post: parsed.clicked_post,
       post_url: cleanPostUrl(parsed.post_url),
       note: typeof parsed.note === 'string' ? parsed.note : '',
+      ...(typeof parsed.commented === 'boolean' ? { commented: parsed.commented } : {}),
     };
   } catch {
     return null;

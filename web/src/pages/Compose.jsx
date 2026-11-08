@@ -28,6 +28,7 @@ export default function Compose({ onScheduled, goDestinations, initialWhen }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [who, setWho] = useState('');
+  const [firstComment, setFirstComment] = useState('');
   const [whoText, setWhoText] = useState(GROUP_DEFAULT);
 
   useEffect(() => { api.destinations().then(setDestinations).catch((e) => setError(e.message)); }, []);
@@ -63,10 +64,11 @@ export default function Compose({ onScheduled, goDestinations, initialWhen }) {
       form.append('body', body);
       form.append('scheduled_at', new Date(when).toISOString());
       if (who) form.append('post_as', who);
+      if (firstComment.trim()) form.append('first_comment', firstComment.trim());
       for (const id of selected) form.append('destination_ids', String(id));
       for (const f of files) form.append('media', f);
       await api.createPost(form);
-      setBody(''); setFiles([]); setSelected(new Set()); setWho(''); setWhoText(GROUP_DEFAULT);
+      setBody(''); setFiles([]); setSelected(new Set()); setWho(''); setFirstComment(''); setWhoText(GROUP_DEFAULT);
       onScheduled();
     } catch (err) {
       setError(err.message);
@@ -126,6 +128,10 @@ export default function Compose({ onScheduled, goDestinations, initialWhen }) {
           </Stack>
         )}
         {mediaProblem && <Alert severity="error" sx={{ mt: 2 }}>{mediaProblem}</Alert>}
+        <TextField multiline minRows={2} fullWidth label="First comment (optional)" sx={{ mt: 2.5 }}
+          placeholder="e.g. Get it here: https://…"
+          value={firstComment} onChange={(e) => setFirstComment(e.target.value)}
+          helperText="Claude adds this as the first comment right after the post is live. Put links here: many groups don't allow links in posts." />
       </Panel>
 
       <Stack spacing={2.5}>

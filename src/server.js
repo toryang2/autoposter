@@ -74,7 +74,7 @@ async function waitFor(check, ms = 5000) {
 
 const JOB_SELECT = `SELECT j.id, j.post_id, j.destination_id, j.scheduled_at, j.status, j.attempts, j.last_error,
   j.post_url, j.started_at, j.finished_at, j.force_now, j.post_as, d.name AS destination_name, d.type AS destination_type, d.url AS destination_url,
-  d.platform AS destination_platform, d.post_as AS destination_post_as, d.archived AS destination_archived, p.body AS post_body FROM jobs j JOIN destinations d ON d.id = j.destination_id JOIN posts p ON p.id = j.post_id`;
+  d.platform AS destination_platform, d.post_as AS destination_post_as, d.archived AS destination_archived, p.body AS post_body, p.first_comment FROM jobs j JOIN destinations d ON d.id = j.destination_id JOIN posts p ON p.id = j.post_id`;
 
 export function createApp(db, p) {
   const app = express();
@@ -141,6 +141,8 @@ export function createApp(db, p) {
     const cleanup = () => files.forEach((f) => fs.rmSync(f.path, { force: true }));
     try {
       const body = String(req.body.body ?? '');
+      const firstComment = String(req.body.first_comment ?? '').trim() || null;
+      if (firstComment && firstComment.length > 2000) throw new HttpError(400, 'The first comment must be 2000 characters or less');
       const whoRaw = String(req.body.post_as ?? '').trim();
       if (whoRaw.length > 100) throw new HttpError(400, 'The Page name is too long');
       const who = whoRaw || null; // null: each group's own setting; '@self': yourself; otherwise a Page name
@@ -165,7 +167,7 @@ export function createApp(db, p) {
       }
 
       const postId = tx(db, () => {
-        const post = db.prepare('INSERT INTO posts(body, created_at) VALUES (?, ?) RETURNING id').get(body, nowIso());
+        const post = db.prepare('INSERT INTO posts(body, first_comment, created_at) VALUES (?, ?, ?) RETURNING id').get(body, firstComment, nowIso());
         const dir = path.join(p.media, String(post.id));
         fs.mkdirSync(dir, { recursive: true });
         files.forEach((f, i) => {

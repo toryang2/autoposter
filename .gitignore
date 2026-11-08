@@ -11,3 +11,5 @@ release/
 electron/
 docs/facebook_groups.csv
 campaign/
+.superpowers/
+release-local/

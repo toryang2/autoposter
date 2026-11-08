@@ -122,9 +122,12 @@ export function recordOutcome(db, job, outcome, settings, now) {
   }
   // A "failed" report after Post was clicked is ambiguous: something may be live.
   const status = result.status === 'failed' && result.clicked_post ? 'needs_check' : result.status;
+  const missedComment = status === 'submitted' && job.first_comment && result.commented !== true;
+  const note = status === 'submitted' || status === 'pending_approval'
+    ? (missedComment ? `Posted, but the first comment wasn't added. Add it yourself: ${result.note}` : null)
+    : result.note;
   db.prepare(`UPDATE jobs SET status = ?, finished_at = ?, last_error = ?, result_json = ?, post_url = ? WHERE id = ?`)
-    .run(status, finished, status === 'submitted' || status === 'pending_approval' ? null : result.note,
-      raw, result.post_url, job.id);
+    .run(status, finished, note, raw, result.post_url, job.id);
   return status;
 }
 
