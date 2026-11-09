@@ -3,7 +3,11 @@ import { Box, Button, IconButton, Paper, Stack, ToggleButton, ToggleButtonGroup,
 import { CalendarDays, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { api, TYPE_LABEL } from '../api.js';
 import { STATUS_COLOR, TYPE_COLOR, tokens } from '../theme.js';
-import { EmptyState, Panel, StatusChip } from '../components.jsx';
+import { delayText, EmptyState, JobStatusChip, Panel } from '../components.jsx';
+import { PostPreview } from '../preview.jsx';
+
+// Clicking a post anywhere on the calendar opens its preview (how it looks on its platform).
+const PreviewContext = React.createContext(() => {});
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MAX_IN_CELL = 3;
@@ -85,11 +89,12 @@ function layoutDay(jobs) {
 }
 
 function CellEntry({ job, onClick }) {
-  const c = STATUS_COLOR[job.status];
+  const preview = React.useContext(PreviewContext);
+  const c = STATUS_COLOR[job.delay ? 'delayed' : job.status];
   return (
-    <Box component="button" onClick={onClick} title={`${TYPE_LABEL[job.destination_type]} · ${job.destination_name}`}
+    <Box component="button" onClick={(e) => { onClick(e); preview(job); }} title={`${TYPE_LABEL[job.destination_type]} · ${job.destination_name}`}
       sx={{ all: 'unset', boxSizing: 'border-box', width: '100%', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 0.75,
-        px: 0.75, py: 0.4, borderRadius: 1.5, bgcolor: c.bg, borderLeft: `3px solid ${TYPE_COLOR[job.destination_type]}`,
+        px: 0.75, py: 0.4, borderRadius: '3px', bgcolor: c.bg, borderLeft: `3px solid ${TYPE_COLOR[job.destination_type]}`,
         opacity: job.status === 'cancelled' ? 0.55 : 1, '&:hover': { filter: 'brightness(0.96)' } }}>
       <Typography sx={{ fontSize: 11, fontWeight: 700, color: c.fg, flex: 'none' }}>{timeOf(job.scheduled_at)}</Typography>
       <Typography noWrap sx={{ fontSize: 11.5, fontWeight: 600, color: tokens.ink, minWidth: 0 }}>{job.destination_name}</Typography>
@@ -135,7 +140,7 @@ function DayCell({ day, month, jobs, selected, onSelect, onAdd }) {
         {extra > 0 && <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: 'text.secondary', pl: 0.5 }}>+{extra} more</Typography>}
       </Stack>
       <Stack direction="row" flexWrap="wrap" gap={0.4} sx={{ display: { xs: 'flex', md: 'none' }, pl: 0.5 }}>
-        {jobs.slice(0, 6).map((j) => <Box key={j.id} sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: STATUS_COLOR[j.status].fg }} />)}
+        {jobs.slice(0, 6).map((j) => <Box key={j.id} sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: STATUS_COLOR[j.delay ? 'delayed' : j.status].fg }} />)}
       </Stack>
     </Box>
   );
@@ -157,15 +162,16 @@ function MonthView({ days, month, byDay, selected, onSelect, onAdd }) {
 }
 
 function TimeEvent({ item, compact, onClick }) {
+  const preview = React.useContext(PreviewContext);
   const { job, start, lane, lanes } = item;
-  const c = STATUS_COLOR[job.status];
+  const c = STATUS_COLOR[job.delay ? 'delayed' : job.status];
   const width = 100 / lanes;
   return (
-    <Box component="button" onClick={onClick} title={`${timeOf(job.scheduled_at)} · ${job.destination_name}`}
+    <Box component="button" onClick={(e) => { onClick(e); preview(job); }} title={`${timeOf(job.scheduled_at)} · ${job.destination_name}`}
       sx={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', position: 'absolute', zIndex: 2,
         top: (start / 60) * HOUR_PX + 1, height: (EVENT_MIN / 60) * HOUR_PX - 2,
         left: `calc(${lane * width}% + 3px)`, width: `calc(${width}% - 6px)`,
-        px: 1, py: 0.5, borderRadius: 1.5, overflow: 'hidden', bgcolor: c.bg,
+        px: 1, py: 0.5, borderRadius: '3px', overflow: 'hidden', bgcolor: c.bg,
         borderLeft: `3px solid ${TYPE_COLOR[job.destination_type]}`, opacity: job.status === 'cancelled' ? 0.55 : 1,
         boxShadow: '0 1px 2px rgba(21,23,28,.08)', '&:hover': { filter: 'brightness(0.96)', zIndex: 3 } }}>
       <Typography noWrap sx={{ fontSize: 11, fontWeight: 700, color: c.fg, lineHeight: 1.3 }}>{timeOf(job.scheduled_at)}</Typography>
@@ -247,7 +253,7 @@ function TimeGridView({ days, byDay, selected, onSelect, onAdd }) {
                       sx={{ height: HOUR_PX, borderTop: h ? 1 : 0, borderColor: '#EFECE6', cursor: open ? 'pointer' : 'default',
                         position: 'relative', '&:hover .slot': { opacity: open ? 1 : 0 } }}>
                       <Stack className="slot" direction="row" alignItems="center" spacing={0.5}
-                        sx={{ opacity: 0, transition: 'opacity .12s', position: 'absolute', inset: 2, px: 1, borderRadius: 1.5,
+                        sx={{ opacity: 0, transition: 'opacity .12s', position: 'absolute', inset: 2, px: 1, borderRadius: '3px',
                           border: `1px dashed ${tokens.signal}`, color: 'primary.main', bgcolor: '#FFF7F3' }}>
                         <Plus size={13} />
                         <Typography sx={{ fontSize: 11.5, fontWeight: 700 }}>{hourLabel(h)}</Typography>
@@ -273,6 +279,7 @@ function TimeGridView({ days, byDay, selected, onSelect, onAdd }) {
 }
 
 function DayAgenda({ day, jobs, onAdd }) {
+  const preview = React.useContext(PreviewContext);
   const past = isPastDay(day);
   return (
     <Panel
@@ -285,17 +292,21 @@ function DayAgenda({ day, jobs, onAdd }) {
         </EmptyState>
       ) : (
         <Stack spacing={0.75}>
-          {jobs.map((j) => (
-            <Box key={j.id} sx={{ px: 1.25, py: 0.875, borderRadius: 2, border: 1, borderColor: 'divider',
+          {/* Latest first: the newest post of the day is on top. */}
+          {[...jobs].sort((x, y) => y.scheduled_at.localeCompare(x.scheduled_at)).map((j) => (
+            <Box key={j.id} role="button" tabIndex={0} onClick={() => preview(j)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); preview(j); } }}
+              sx={{ cursor: 'pointer', '&:hover': { bgcolor: '#FCFBF8', borderColor: '#D9D4CA' }, px: 1.25, py: 0.875, borderRadius: '3px', border: 1, borderColor: 'divider',
               borderLeft: `3px solid ${TYPE_COLOR[j.destination_type]}` }}>
               <Stack direction="row" alignItems="center" spacing={1}>
                 <Typography fontWeight={800} fontSize={13} sx={{ fontFamily: '"Bricolage Grotesque Variable"', flex: 'none', minWidth: 62 }}>{timeOf(j.scheduled_at)}</Typography>
                 <Typography fontWeight={700} fontSize={13} noWrap sx={{ flex: 1, minWidth: 0 }} title={j.destination_name}>{j.destination_name}</Typography>
-                <Box sx={{ flex: 'none', '& .MuiChip-root': { height: 22, fontSize: 11.5 } }}><StatusChip status={j.status} /></Box>
+                <Box sx={{ flex: 'none', '& .MuiChip-root': { height: 22, fontSize: 11.5 } }}><JobStatusChip job={j} /></Box>
               </Stack>
               <Typography noWrap fontSize={12.5} color="text.secondary" mt={0.25} title={j.post_body}>
                 {(j.post_body || '(media only)').replace(/\s+/g, ' ')}
               </Typography>
+              {j.delay && <Typography variant="caption" fontWeight={600} sx={{ color: '#B54708' }} display="block" noWrap mt={0.25} title={delayText(j.delay)}>{delayText(j.delay)}</Typography>}
               {j.last_error && <Typography variant="caption" color="error" display="block" noWrap mt={0.25} title={j.last_error}>{j.last_error}</Typography>}
             </Box>
           ))}
@@ -315,6 +326,7 @@ export default function Calendar({ onAdd }) {
   const [anchor, setAnchor] = useState(() => new Date());
   const [selected, setSelected] = useState(() => new Date());
   const [jobs, setJobs] = useState([]);
+  const [previewing, setPreviewing] = useState(null);
 
   const days = useMemo(() => visibleDays(view, anchor), [view, anchor]);
   const load = useCallback(() => {
@@ -358,6 +370,8 @@ export default function Calendar({ onAdd }) {
   const rangeWord = { month: 'this month', week: 'this week', day: 'this day' }[view];
 
   return (
+    <PreviewContext.Provider value={setPreviewing}>
+    {previewing && <PostPreview job={previewing} onClose={() => setPreviewing(null)} />}
     <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', lg: 'minmax(0,1fr) 340px' }, alignItems: 'start' }}>
       <Paper sx={{ overflow: 'hidden' }}>
         <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'stretch', sm: 'center' }} spacing={1.5}
@@ -402,5 +416,6 @@ export default function Calendar({ onAdd }) {
 
       <DayAgenda day={selected} jobs={byDay.get(dayKey(selected)) || []} onAdd={(d) => add(d)} />
     </Box>
+    </PreviewContext.Provider>
   );
 }

@@ -15,7 +15,9 @@ export const STATUS_COLOR = {
   awaiting_join: { fg: '#0E8A7E', bg: '#DDF3F0' },
   failed: { fg: '#C42B1C', bg: '#FCE3DF' },
   needs_check: { fg: '#9A5B00', bg: '#FDEFD6' },
+  needs_login: { fg: '#9A5B00', bg: '#FDEFD6' },
   cancelled: { fg: '#8C909A', bg: '#F0EEE9' },
+  delayed: { fg: '#B54708', bg: '#FDEBD3' },
 };
 
 export const TYPE_COLOR = { profile: '#1C5FD1', page: '#7A3FD1', group: '#0E8A7E' };

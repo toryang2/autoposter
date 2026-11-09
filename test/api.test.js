@@ -1,6 +1,6 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { setup, addDestination, addJob } from './helpers.js';
+import { setup, addDestination, addJob, FAKE_CLAUDE } from './helpers.js';
 import { createApp } from '../src/server.js';
 
 let server, base, db;
@@ -191,4 +191,29 @@ test('Compose "Who" sets who posts in Facebook groups only', async () => {
   assert.deepEqual((await schedule('@self')).map((r) => r.post_as), ['@self', null]);
   assert.deepEqual((await schedule()).map((r) => r.post_as), [null, null], 'no choice keeps the group setting');
   for (const id of [g.id, pf.id]) await fetch(`${base}/api/destinations/${id}`, { method: 'DELETE' });
+});
+
+test('readiness: four checks, and the worker and test automation are refused until the earlier steps pass', async () => {
+  process.env.CLAUDE_BIN = FAKE_CLAUDE; // reports "not logged in"
+  try {
+    const s = await (await fetch(`${base}/api/setup`)).json();
+    assert.deepEqual(s.readiness.checks.map((c) => c.id), ['installed', 'auth', 'extension', 'automation']);
+    assert.equal(s.readiness.checks[0].ok, true);
+    assert.equal(s.readiness.checks[1].ok, false);
+    assert.equal(s.readiness.ready, false);
+    const start = await fetch(`${base}/api/worker/start`, { method: 'POST' });
+    assert.equal(start.status, 409);
+    assert.match((await start.json()).error, /Setup isn't finished/);
+    const t = await fetch(`${base}/api/setup/test-automation`, { method: 'POST' });
+    assert.equal(t.status, 409);
+    assert.match((await t.json()).error, /log in with a Claude/);
+  } finally {
+    delete process.env.CLAUDE_BIN;
+  }
+});
+
+test('update check is off outside the desktop app', async () => {
+  const r = await (await fetch(`${base}/api/update`)).json();
+  assert.equal(r.available, false);
+  assert.match(r.current, /^\d+\.\d+\.\d+/);
 });

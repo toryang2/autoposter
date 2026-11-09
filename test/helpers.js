@@ -9,6 +9,8 @@ export function setup() {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'autoposter-test-'));
   const p = paths(home);
   const db = openDb(p.db);
+  // Most tests run as if Setup's test automation already passed; the readiness tests clear it.
+  db.prepare("INSERT OR REPLACE INTO settings(key, value) VALUES ('setup_verified_at', ?)").run(nowIso());
   return { home, p, db };
 }
 

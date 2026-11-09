@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { setup, FAKE_CLAUDE } from './helpers.js';
-import { runJob, parseResultBlock, buildArgs, cleanEnv, cleanPostUrl } from '../src/runner.js';
+import { runJob, parseResultBlock, buildArgs, cleanEnv, cleanPostUrl, runTestAutomation, TEST_AUTOMATION_PROMPT } from '../src/runner.js';
 
 const job = { id: 1, attempts: 1, destination_type: 'group', destination_name: 'Test Group',
   destination_url: 'https://www.facebook.com/groups/x', destination_audience: 'default', post_body: 'Hi there' };
@@ -153,4 +153,43 @@ test('a first comment is added after the post is live, and asked for in the repo
   assert.match(withComment, /"commented":true\|false/);
   assert.doesNotMatch(buildPrompt(g, []), /FIRST COMMENT|commented/);
   assert.equal(parseResultBlock('```json\n{"status":"submitted","clicked_post":true,"post_url":null,"commented":false,"note":"x"}\n```').commented, false);
+});
+
+test('setup test automation: passes when Claude drives Chrome, fails with the reason otherwise', async () => {
+  const { p } = setup();
+  const record = path.join(p.home, 'record.json');
+  process.env.FAKE_RECORD = record;
+  process.env.FAKE_MODE = 'automation_ok';
+  let r;
+  try { r = await runTestAutomation(FAKE_CLAUDE, p); } finally { delete process.env.FAKE_RECORD; }
+  assert.deepEqual(r, { ok: true, facebook_signed_in: true, note: 'Feed visible', error: null });
+  const rec = JSON.parse(fs.readFileSync(record, 'utf8'));
+  assert.ok(rec.args.includes('--chrome') && !rec.args.includes('--bare'));
+  assert.equal(rec.input, TEST_AUTOMATION_PROMPT);
+  assert.match(TEST_AUTOMATION_PROMPT, /Do NOT post/);
+  assert.ok(fs.existsSync(path.join(p.logs, 'setup-test.json')));
+
+  process.env.FAKE_MODE = 'automation_no_chrome';
+  r = await runTestAutomation(FAKE_CLAUDE, p);
+  assert.equal(r.ok, false);
+  assert.match(r.error, /No browser/);
+  for (const mode of ['garbage', 'crash', 'usage']) {
+    process.env.FAKE_MODE = mode;
+    assert.equal((await runTestAutomation(FAKE_CLAUDE, p)).ok, false, mode);
+  }
+  process.env.FAKE_MODE = 'hang';
+  r = await runTestAutomation(FAKE_CLAUDE, p, { timeoutMs: 50 });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /did not finish/);
+});
+
+test('files over 10 MB never go through Chrome: the post fails before Claude runs, saying to log in inside the app', async () => {
+  const { p } = setup();
+  const src = path.join(p.media, 'big.mp4');
+  fs.writeFileSync(src, Buffer.alloc(10 * 1024 * 1024 + 1));
+  const job = { id: 77, attempts: 1, account_name: 'Shop', destination_name: 'G', destination_type: 'group', destination_url: 'https://www.facebook.com/groups/1', destination_platform: 'facebook', post_body: 'x' };
+  const r = await runJob(job, [{ path: src, size_bytes: 10 * 1024 * 1024 + 1 }], { paths: p, settings: { model: 'sonnet', job_timeout_min: 1 }, claudeBin: FAKE_CLAUDE });
+  assert.equal(r.result.status, 'failed');
+  assert.equal(r.result.clicked_post, false);
+  assert.match(r.result.note, /over 10 MB[\s\S]*inside the Autoposter app/);
 });

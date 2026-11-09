@@ -16,6 +16,10 @@ process.stdin.on('end', () => {
     case 'garbage': env('I posted it, I think.'); break;
     case 'crash': process.stderr.write('boom'); process.exit(3);
     case 'usage': process.stderr.write('Claude usage limit reached. Your limit will reset at 5pm'); process.exit(1);
+    case 'automation_ok': env('{"opened_tab": true, "page_loaded": true, "facebook_signed_in": true, "closed_tab": true, "note": "Feed visible"}'); break;
+    case 'automation_no_chrome': env('{"opened_tab": false, "page_loaded": false, "facebook_signed_in": false, "closed_tab": false, "note": "No browser is connected"}'); break;
     case 'hang': setTimeout(() => {}, 1e9); break;
+    case 'comment': env('{"options":["Grab yours here: https://x.com","Which scent would you pick?"]}'); break;
+    case 'compose': env('{"options":[{"body":"Option one","first_comment":""},{"body":"Option two","first_comment":"Here\'s the link: https://x.com"}]}'); break;
   }
 });

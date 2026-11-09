@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Box, Button, Chip, Link, Stack, Typography } from '@mui/material';
-import { CircleCheck, Globe, Circle, PlugZap, Download, ExternalLink, LogIn, Play, RefreshCw, SquareTerminal } from 'lucide-react';
+import { Alert, Box, Button, Chip, Link, Paper, Stack, Typography } from '@mui/material';
+import { CircleCheck, CircleX, Globe, Circle, PlugZap, Download, ExternalLink, LogIn, Play, RefreshCw, ShieldCheck, ShieldAlert, SquareTerminal, Workflow } from 'lucide-react';
 import { api } from '../api.js';
 import { Panel, WorkerControl } from '../components.jsx';
 
@@ -13,8 +13,40 @@ export function claudeReady(s) {
   return Boolean(s?.claude_installed && s.logged_in && s.subscription && s.paid_plan !== false);
 }
 
+// Every readiness check passed: installed, subscription login, extension, test automation. Scheduled posts need it.
 export function setupReady(s) {
-  return claudeReady(s) && Boolean(s.chrome_extension?.length);
+  return Boolean(s?.readiness?.ready);
+}
+
+function ReadinessCard({ readiness, verifiedAt }) {
+  const passed = readiness.checks.filter((c) => c.ok).length;
+  const ready = readiness.ready;
+  const Icon = ready ? ShieldCheck : ShieldAlert;
+  return (
+    <Paper sx={{ p: { xs: 2, md: 2.5 }, borderLeft: 4, borderColor: ready ? 'success.main' : 'warning.main' }}>
+      <Stack direction="row" spacing={1.5} alignItems="center">
+        <Box sx={{ color: ready ? 'success.main' : 'warning.main', flex: 'none' }}><Icon size={28} /></Box>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="h2">{ready ? 'Ready to post' : 'Not ready to post yet'}</Typography>
+          <Typography color="text.secondary" fontSize={14}>
+            {ready
+              ? `All ${readiness.checks.length} checks passed${verifiedAt ? `; test automation passed ${new Date(verifiedAt).toLocaleString()}` : ''}. Scheduled posts can go out.`
+              : `${passed} of ${readiness.checks.length} checks passed. Scheduled posts stay on hold until all of them do.`}
+          </Typography>
+        </Box>
+      </Stack>
+      <Box component="ul" sx={{ listStyle: 'none', p: 0, m: 0, mt: 1.75, display: 'grid', gap: 0.75,
+        gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
+        {readiness.checks.map((c) => (
+          <Stack key={c.id} component="li" direction="row" spacing={1} alignItems="center"
+            sx={{ color: c.ok ? 'success.main' : 'text.secondary', fontSize: 14 }}>
+            {c.ok ? <CircleCheck size={17} /> : <CircleX size={17} />}
+            <Typography fontSize={14} color={c.ok ? 'text.primary' : 'text.secondary'}>{c.label}</Typography>
+          </Stack>
+        ))}
+      </Box>
+    </Paper>
+  );
 }
 
 function Step({ n, done, title, children }) {
@@ -37,9 +69,26 @@ export default function Setup({ status, onStatusChange, go, onSetupChange }) {
   const [note, setNote] = useState('');
   const [checking, setChecking] = useState(false);
   const [chromeTest, setChromeTest] = useState(null); // null | 'running' | { ok, browsers, error }
+  const [autoTest, setAutoTest] = useState(null); // null | 'running' | { ok, facebook_signed_in, note, error }
+  // A passing connection test goes straight on to the test automation (step 4) if it hasn't passed yet,
+  // so the last readiness check doesn't stay unticked without the person noticing step 4.
   async function testChrome() {
     setChromeTest('running');
-    try { setChromeTest(await api.testChrome()); } catch (e) { setChromeTest({ ok: false, error: e.message }); }
+    let r;
+    try { r = await api.testChrome(); } catch (e) { r = { ok: false, error: e.message }; }
+    setChromeTest(r);
+    if (r.ok && !s.verified_at) testAutomation();
+  }
+  async function testAutomation() {
+    setAutoTest('running');
+    try {
+      const r = await api.testAutomation();
+      setAutoTest(r);
+      setS(r.setup);
+      onSetupChange?.(r.setup);
+    } catch (e) {
+      setAutoTest({ ok: false, error: e.message });
+    }
   }
 
   const check = useCallback(async () => {
@@ -67,9 +116,10 @@ export default function Setup({ status, onStatusChange, go, onSetupChange }) {
 
   return (
     <Stack spacing={2.5} sx={{ maxWidth: 820 }}>
-      {setupReady(s)
-        ? <Alert severity="success">Claude Code is ready on your Claude subscription. Finish the Chrome step if you haven't, then you're set.</Alert>
-        : <Alert severity="info">Autoposter uses Claude Code with your own Claude subscription (Pro or Max). No API key. This takes about 5 minutes, once.</Alert>}
+      {s.readiness && <ReadinessCard readiness={s.readiness} verifiedAt={s.verified_at} />}
+      {!setupReady(s) && (
+        <Alert severity="info">Autoposter uses Claude Code with your own Claude subscription (Pro or Max). No API key. This takes about 5 minutes, once.</Alert>
+      )}
       {note && <Alert severity="info" onClose={() => setNote('')}>{note}</Alert>}
       {error && <Alert severity="error">{error}</Alert>}
 
@@ -123,8 +173,25 @@ export default function Setup({ status, onStatusChange, go, onSetupChange }) {
           )}
         </Step>
 
-        <Step n={3} done={Boolean(s.chrome_extension?.length) && chromeTest?.ok === true}
-          title="Install Claude in Chrome and connect it">
+        <Step n={3} done={s.app_accounts > 0 || (Boolean(s.chrome_extension?.length) && chromeTest?.ok === true)}
+          title={s.app ? 'Log in to your accounts in Autoposter' : 'Install Claude in Chrome and connect it'}>
+          {s.app && (
+            <>
+              <Typography fontSize={14} mb={1.25}>
+                {s.app_accounts > 0
+                  ? <><strong>{s.app_accounts} account{s.app_accounts === 1 ? '' : 's'} logged in</strong> inside Autoposter. Posts from them don't need Chrome.</>
+                  : <>Add the accounts you post from, then click <strong>Log in</strong> next to each one. Each logs in once right here inside
+                      Autoposter and stays logged in. No Chrome or extension needed.</>}
+              </Typography>
+              <Button variant={s.app_accounts > 0 ? 'outlined' : 'contained'} color={s.app_accounts > 0 ? 'secondary' : 'primary'}
+                startIcon={<LogIn size={16} />} onClick={() => go('accounts')} sx={{ mb: 2 }}>
+                Open Accounts
+              </Button>
+              <Typography variant="caption" color="text.secondary" display="block" mb={1}>
+                Or, instead, post through your own Chrome with the Claude in Chrome extension:
+              </Typography>
+            </>
+          )}
           {s.chrome_extension?.length ? (
             <Typography fontSize={14} mb={1.25}>
               <strong>Installed</strong> in {s.chrome_extension.map((e) => `${e.browser} (${e.profile})`).join(', ')}.
@@ -154,7 +221,10 @@ export default function Setup({ status, onStatusChange, go, onSetupChange }) {
             </Button>
           </Stack>
           {chromeTest && chromeTest !== 'running' && (chromeTest.ok
-            ? <Alert severity="success" sx={{ mt: 1.25 }}>Connected: Claude can reach {chromeTest.browsers} Chrome browser{chromeTest.browsers === 1 ? '' : 's'}.</Alert>
+            ? <Alert severity="success" sx={{ mt: 1.25 }}>
+                Connected: Claude can reach {chromeTest.browsers} Chrome browser{chromeTest.browsers === 1 ? '' : 's'}.
+                {autoTest === 'running' && ' Now running the test automation (step 4)…'}
+              </Alert>
             : <Alert severity="error" sx={{ mt: 1.25 }}>
                 Claude couldn't reach Chrome{chromeTest.error ? `: ${chromeTest.error}` : '.'} Open Chrome, make sure the extension is
                 signed in to your Claude account, then test again.
@@ -164,12 +234,33 @@ export default function Setup({ status, onStatusChange, go, onSetupChange }) {
           </Typography>
         </Step>
 
-        <Step n={4} done={false} title="Send a test post">
-          <Typography fontSize={14}>
-            In <Link component="button" onClick={() => go('destinations')}>Destinations</Link>, add your profile
-            (<code>https://www.facebook.com/me</code>) with the audience <strong>Only me</strong>. Then write a short post
-            in <Link component="button" onClick={() => go('compose')}>Compose</Link>, open it in the Queue and press{' '}
-            <strong>Post now</strong>. Only you will see it.
+        <Step n={4} done={Boolean(s.readiness?.checks.find((c) => c.id === 'automation')?.ok)} title="Run a test automation">
+          <Typography fontSize={14} mb={1.25}>
+            {s.app_accounts > 0
+              ? 'Claude opens one of your logged-in accounts in a hidden Autoposter window and checks it is signed in.'
+              : "Claude opens a new tab in your Chrome, loads Facebook, checks whether you're signed in and closes the tab."}{' '}
+            It doesn't post, like or click anything.
+          </Typography>
+          <Button variant="contained" startIcon={<Workflow size={16} />}
+            disabled={!claudeReady(s) || (!s.chrome_extension?.length && !(s.app_accounts > 0)) || autoTest === 'running'} onClick={testAutomation}>
+            {autoTest === 'running' ? 'Running… (up to 4 minutes)' : s.verified_at ? 'Run the test again' : 'Run test automation'}
+          </Button>
+          {autoTest && autoTest !== 'running' && (autoTest.ok
+            ? <Alert severity={autoTest.facebook_signed_in ? 'success' : 'warning'} sx={{ mt: 1.25 }}>
+                Claude drove the browser end to end.{' '}
+                {autoTest.facebook_signed_in
+                  ? 'The account is signed in, so scheduled posts can go out.'
+                  : "The account isn't signed in there. Log in to every account you'll post from before posts are due."}
+                {autoTest.note ? ` (${autoTest.note})` : ''}
+              </Alert>
+            : <Alert severity="error" sx={{ mt: 1.25 }}>
+                The test didn't pass{autoTest.error ? `: ${autoTest.error}` : '.'} Fix that and run it again.
+              </Alert>)}
+          <Typography variant="caption" color="text.secondary" display="block" mt={1}>
+            Uses a little of your Claude usage. Run it again after you change Claude accounts or reinstall the extension.
+            Want to see a real post? Add your profile with the audience <strong>Only me</strong> in{' '}
+            <Link component="button" onClick={() => go('destinations')}>Destinations</Link>, write one in{' '}
+            <Link component="button" onClick={() => go('compose')}>Compose</Link> and press <strong>Post now</strong> in the Queue.
           </Typography>
         </Step>
 
@@ -179,7 +270,15 @@ export default function Setup({ status, onStatusChange, go, onSetupChange }) {
               ? 'It keeps running while Autoposter is in the menu bar or system tray, and starts again when you reopen the app.'
               : 'Keep this computer awake and Chrome open.'}
           </Typography>
-          {status && !status.worker_running && <WorkerControl status={status} onChange={onStatusChange} />}
+          {status && !status.worker_running && (
+            <WorkerControl status={status} onChange={onStatusChange}
+              blocked={setupReady(s) ? null : 'Finish steps 1–4 first: scheduled posts are on hold until every check passes'} />
+          )}
+          {!setupReady(s) && (
+            <Typography variant="caption" color="text.secondary" display="block" mt={1}>
+              Available once steps 1–4 pass.
+            </Typography>
+          )}
           {status?.worker_running && <Chip color="success" icon={<Play size={14} />} label="Worker running" />}
         </Step>
       </Panel>

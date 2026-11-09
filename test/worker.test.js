@@ -27,7 +27,7 @@ test('a job can only be claimed once', () => {
   assert.equal(claimNext(db, s, T0), null);
 });
 
-test('group posts are spaced by group_gap_minutes; pages are not', async () => {
+test('group posts are spaced by group_gap_minutes, and later posts wait their turn', async () => {
   const { db, p } = setup();
   const g1 = addDestination(db, { name: 'G1', type: 'group' });
   const g2 = addDestination(db, { name: 'G2', type: 'group' });
@@ -37,9 +37,9 @@ test('group posts are spaced by group_gap_minutes; pages are not', async () => {
   const j3 = addJob(db, pg.id, T0);
   const opts = (now) => ({ paths: p, runJob: fakeRun(ok), now: () => now });
   assert.equal((await tick(db, opts(T0))).jobId, j1.id);
-  assert.equal((await tick(db, opts(at(1)))).jobId, j3.id, 'page runs while group is blocked');
-  assert.equal((await tick(db, opts(at(5)))).action, 'idle');
+  assert.equal((await tick(db, opts(at(1)))).action, 'idle', 'the page post waits behind the held group post');
   assert.equal((await tick(db, opts(at(20)))).jobId, j2.id);
+  assert.equal((await tick(db, opts(at(21)))).jobId, j3.id);
 });
 
 test('daily cap stops further runs', async () => {
@@ -190,4 +190,90 @@ test('posted without its first comment: still Posted, with a note to add it by h
   const row = db.prepare('SELECT status, last_error FROM jobs WHERE id = ?').get(j.id);
   assert.equal(row.status, 'submitted');
   assert.match(row.last_error, /first comment wasn't added/);
+});
+
+test('scheduled posts wait until Setup passes; Post now still goes', async () => {
+  const { db, p } = setup();
+  setSetting(db, 'setup_verified_at', '');
+  const d = addDestination(db);
+  const due = addJob(db, d.id, T0);
+  assert.equal((await tick(db, { paths: p, runJob: fakeRun(ok), now: () => T0 })).action, 'not_ready');
+  assert.equal(status(db, due.id), 'queued');
+  db.prepare('UPDATE jobs SET force_now = 1 WHERE id = ?').run(due.id);
+  assert.equal((await tick(db, { paths: p, runJob: fakeRun(ok), now: () => T0 })).action, 'ran');
+});
+
+test('a post waiting for group approval is looked at again later, and marked posted once it is live', async () => {
+  const { db, p } = setup();
+  const g = addDestination(db, { name: 'G', type: 'group' });
+  const j = addJob(db, g.id, T0);
+  const pending = { kind: 'result', result: { status: 'pending_approval', clicked_post: true, post_url: null, note: '' } };
+  await tick(db, { paths: p, runJob: fakeRun(pending), now: () => T0 });
+  const row = () => db.prepare('SELECT status, next_check_at, approval_checks, last_error FROM jobs WHERE id = ?').get(j.id);
+  assert.equal(row().next_check_at, at(30).toISOString());
+  // Not due yet: nothing to do.
+  assert.equal((await tick(db, { paths: p, runJob: fakeRun(pending), now: () => at(10) })).action, 'idle');
+  // First look: still waiting, so the next look is 3 hours later.
+  const modes = [];
+  const still = async (job, media, o) => { modes.push(o.mode); return { kind: 'result', result: { status: 'pending_approval', clicked_post: false, post_url: null, note: '' } }; };
+  const r1 = await tick(db, { paths: p, runJob: still, now: () => at(31) });
+  assert.equal(r1.action, 'checked');
+  assert.deepEqual(modes, ['check']);
+  assert.equal(row().approval_checks, 1);
+  assert.equal(row().next_check_at, at(31 + 180).toISOString());
+  // Second look: approved.
+  const live = fakeRun({ kind: 'result', result: { status: 'submitted', clicked_post: false, post_url: null, note: '' } });
+  assert.equal((await tick(db, { paths: p, runJob: live, now: () => at(220) })).status, 'submitted');
+  assert.equal(row().status, 'submitted');
+  assert.equal(row().next_check_at, null);
+});
+
+test('approval looks stop after the last one, and a usage limit only postpones a look', async () => {
+  const { db, p } = setup();
+  const g = addDestination(db, { name: 'G', type: 'group' });
+  const j = addJob(db, g.id, T0);
+  db.prepare("UPDATE jobs SET status = 'pending_approval', next_check_at = ?, approval_checks = 3 WHERE id = ?").run(T0.toISOString(), j.id);
+  const row = () => db.prepare('SELECT status, next_check_at, approval_checks, last_error FROM jobs WHERE id = ?').get(j.id);
+  await tick(db, { paths: p, runJob: fakeRun({ kind: 'usage_limit', error: 'limit' }), now: () => T0 });
+  assert.equal(row().approval_checks, 3);
+  assert.equal(row().next_check_at, at(60).toISOString());
+  const still = fakeRun({ kind: 'result', result: { status: 'pending_approval', clicked_post: false, post_url: null, note: '' } });
+  await tick(db, { paths: p, runJob: still, now: () => at(61) });
+  assert.equal(row().status, 'pending_approval');
+  assert.equal(row().next_check_at, null);
+  assert.match(row().last_error, /2 days/);
+});
+
+test('a post the group declined becomes failed and is not looked at again', async () => {
+  const { db, p } = setup();
+  const g = addDestination(db, { name: 'G', type: 'group' });
+  const j = addJob(db, g.id, T0);
+  db.prepare("UPDATE jobs SET status = 'pending_approval', next_check_at = ? WHERE id = ?").run(T0.toISOString(), j.id);
+  const declined = fakeRun({ kind: 'result', result: { status: 'failed', clicked_post: false, post_url: null, note: 'Under Declined' } });
+  assert.equal((await tick(db, { paths: p, runJob: declined, now: () => T0 })).status, 'failed');
+  const r = db.prepare('SELECT status, next_check_at, last_error FROM jobs WHERE id = ?').get(j.id);
+  assert.equal(r.status, 'failed');
+  assert.equal(r.next_check_at, null);
+  assert.match(r.last_error, /declined/);
+});
+
+test('late posts say why they are delayed and when they should go', async () => {
+  const { db, p } = setup();
+  const { delayReasons } = await import('../src/worker.js');
+  const g1 = addDestination(db, { name: 'G1', type: 'group' });
+  const g2 = addDestination(db, { name: 'G2', type: 'group' });
+  const pg = addDestination(db, { name: 'P', type: 'page' });
+  const j1 = addJob(db, g1.id, T0);
+  const j2 = addJob(db, g2.id, at(10));
+  const j3 = addJob(db, pg.id, at(20));
+  assert.match(delayReasons(db, { workerRunning: false, now: at(30) })[j2.id].reason, /worker is stopped/);
+  await tick(db, { paths: p, runJob: fakeRun(ok), now: () => at(30) }); // j1 goes, starting the group gap
+  const d = delayReasons(db, { workerRunning: true, now: at(35) });
+  assert.equal(d[j1.id], undefined);
+  assert.match(d[j2.id].reason, /minutes apart/);
+  assert.equal(d[j2.id].eta, at(30 + Number(getSettings(db).group_gap_minutes)).toISOString());
+  assert.match(d[j3.id].reason, /behind the earlier post to G2/);
+  // Not late yet: no reason.
+  const j4 = addJob(db, pg.id, at(35));
+  assert.equal(delayReasons(db, { workerRunning: true, now: at(35) })[j4.id], undefined);
 });

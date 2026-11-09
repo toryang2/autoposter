@@ -87,10 +87,9 @@ export default function Settings({ onChange }) {
             <MenuItem value="opus">Opus — most capable, uses more of your plan</MenuItem>
             <MenuItem value="haiku">Haiku — lightest, less reliable on Facebook</MenuItem>
           </TextField>
-          <TextField fullWidth label="Facebook account (optional)" value={s.fb_account_url ?? ''} sx={{ mt: 3 }}
-            placeholder="https://www.facebook.com/your.profile"
-            onChange={(e) => setS({ ...s, fb_account_url: e.target.value })}
-            helperText="Only this account may post. Open facebook.com/me and paste the address it lands on. Leave empty if only one Chrome is signed in to Facebook." />
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 3 }}>
+            Which Facebook (or other) account posts is set on the <a href="#accounts">Accounts</a> page, and per post in Compose.
+          </Typography>
         </Panel>
         {error && <Alert severity="error">{error}</Alert>}
         <Box><Button type="submit" variant="contained" size="large">Save settings</Button></Box>

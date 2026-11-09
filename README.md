@@ -84,6 +84,46 @@ scheduled posts still go out; use **Open at login** in its tray menu to start it
 the computer must be on and awake (the app keeps it from sleeping while the worker runs) and Chrome must be open.
 Your data stays on your computer, in `~/Library/Application Support/Autoposter` or `%APPDATA%\Autoposter`.
 
+## Desktop app vs web app
+
+Autoposter comes two ways. The **desktop app** is the paid, ready-to-install version. The **web app** is the free
+version you [run from source](#run-from-source) and open in your browser at `http://127.0.0.1:4317`.
+
+### Same in both
+
+| Feature | Desktop app | Web app |
+|---|:---:|:---:|
+| Schedule posts to Facebook, LinkedIn, X, Threads, Reddit, Instagram and TikTok | ✅ | ✅ |
+| Calendar, Queue and Dashboard | ✅ | ✅ |
+| **Write with AI**: posts in any language, with goal, audience, format, style, hook, 36 writing frameworks and word counts | ✅ | ✅ |
+| **Write with AI** for the first comment (links, questions, extra details) | ✅ | ✅ |
+| **Post preview**: see how a post looks on each platform before it goes out | ✅ | ✅ |
+| Edit queued posts (text, photos, time) and destinations | ✅ | ✅ |
+| **Delayed** badge that says why a post is late and when it goes | ✅ | ✅ |
+| Post now, picking which account posts it | ✅ | ✅ |
+| Drag-and-drop photos and video | ✅ | ✅ |
+
+### Only in the desktop app
+
+| Feature | Desktop app | Web app |
+|---|:---:|:---:|
+| **All your accounts logged in at once**: each account logs in once inside Autoposter and stays logged in, with no switching | ✅ | One account at a time, in your Chrome |
+| **Posts in the background**: hidden windows, so you keep using your computer | ✅ | Posts in your Chrome, where you can see it working |
+| **Create image with AI**: Claude designs post graphics, with or without your own photos (square, 4:5, story, landscape) | ✅ | Not yet |
+| **Your Facebook Pages listed automatically** under each account, so you can post in groups as a Page | ✅ | — |
+| Real profile pictures for every account and Page | ✅ | — |
+| Built-in browser: links open inside Autoposter, logged in as the right account | ✅ | Opens in Chrome |
+| Checks posts waiting for group approval in the background | ✅ | Through Chrome |
+| **Big videos for TikTok and Reels**: up to 4 GB per post | ✅ | 10 MB (the Chrome extension's upload limit) |
+| Menu bar / tray app, starts with your computer, keeps it awake at post time | ✅ | — |
+| One-click installer for Mac and Windows, and automatic updates | ✅ | — |
+
+Both use your own Claude subscription (Pro or Max). Neither needs an API key.
+
+<p align="center">
+  <a href="https://raket5.gumroad.com/l/autoposter"><img src="docs/buttons/get-the-app.svg" alt="Get the app: $39 one-time on Gumroad, Mac and Windows" width="460"></a>
+</p>
+
 ## Run from source
 
 Node 24+ and Claude Code logged in with your Claude subscription (`claude auth status` shows `"authMethod": "claude.ai"`).
@@ -138,7 +178,9 @@ Chrome must be signed in to each account you post to. The group gap applies betw
   plan's usage limits. When a limit is hit, the worker pauses for 1 hour and requeues the post.
 - **Check the terms yourself.** Make sure that running Claude Code unattended on a schedule is allowed by
   your current Claude subscription terms.
-- **Media is capped at 10 MB per post** (a limit of the Chrome extension's file upload), so most phone videos won't fit.
+- **Media size per post: 10 MB in the web app, 4 GB in the desktop app.** The web app uploads through the Claude in Chrome
+  extension, whose file upload stops at 10 MB, so most phone videos won't fit there. The desktop app attaches files in its
+  own window, so full TikTok videos and Reels fit.
 - If the computer sleeps, Chrome is closed or Facebook logs you out, posts run late or fail and the dashboard shows it.
   CAPTCHAs and security checks are never bypassed; the post fails and you handle it.
 - One Facebook login (the one in Chrome). Pages are posted to by switching into the Page.

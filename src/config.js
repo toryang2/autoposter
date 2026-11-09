@@ -24,8 +24,14 @@ export function paths(home = process.env.AUTOPOSTER_HOME || projectRoot) {
 export const PORT = Number(process.env.AUTOPOSTER_PORT || 4317);
 export const HOST = '127.0.0.1';
 
+// Claude in Chrome's file upload caps one call at 10 MB. The desktop app attaches files itself, in its own posting
+// window, so big videos (TikTok, Reels) fit: up to 4 GB.
+export const CHROME_MAX_BYTES = 10 * 1024 * 1024;
+export const APP_MAX_BYTES = 4 * 1024 * 1024 * 1024;
+const DESKTOP = Boolean(process.versions.electron);
 export const LIMITS = {
-  maxFileBytes: 10 * 1024 * 1024, // Claude in Chrome file_upload caps one call at 10 MB
-  maxTotalBytes: 10 * 1024 * 1024,
+  maxFileBytes: DESKTOP ? APP_MAX_BYTES : CHROME_MAX_BYTES,
+  maxTotalBytes: DESKTOP ? APP_MAX_BYTES : CHROME_MAX_BYTES,
   maxFiles: 10,
 };
+export const sizeLabel = (bytes) => (bytes >= 1024 ** 3 ? `${Math.round(bytes / 1024 ** 3)} GB` : `${Math.round(bytes / 1024 ** 2)} MB`);
